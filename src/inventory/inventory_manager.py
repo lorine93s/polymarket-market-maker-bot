@@ -71,6 +71,8 @@ class InventoryManager:
         return base_size
 
     def get_quote_size_no(self, base_size: float, price: float) -> float:
+        if price >= 1.0:
+            return 0.0
         if not self.can_quote_no(base_size):
             max_size = max(0, abs(self.min_exposure_usd - self.inventory.net_exposure_usd))
             return min(base_size, max_size / (1.0 - price))
