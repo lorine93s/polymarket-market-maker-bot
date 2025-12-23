@@ -73,7 +73,7 @@ class MarketMakerBot:
         except Exception as e:
             logger.error("orderbook_update_failed", error=str(e))
 
-    def _handle_orderbook_update(self, data: dict[str, Any]):
+    async def _handle_orderbook_update(self, data: dict[str, Any]):
         if data.get("market") == self.settings.market_id:
             self.current_orderbook = data.get("book", self.current_orderbook)
 
@@ -94,7 +94,7 @@ class MarketMakerBot:
         best_bid = float(orderbook.get("best_bid", 0))
         best_ask = float(orderbook.get("best_ask", 1))
         
-        if best_bid <= 0 or best_ask <= 1:
+        if best_bid <= 0 or best_ask <= 0:
             logger.warning("invalid_orderbook", best_bid=best_bid, best_ask=best_ask)
             return
         
@@ -221,7 +221,6 @@ class MarketMakerBot:
 
 
 async def bootstrap(settings: Settings):
-    load_dotenv()
     configure_logging(settings.log_level)
     start_metrics_server(settings.metrics_host, settings.metrics_port)
 
@@ -248,6 +247,7 @@ async def bootstrap(settings: Settings):
 
 
 def main():
+    load_dotenv()
     settings = get_settings()
     asyncio.run(bootstrap(settings))
 

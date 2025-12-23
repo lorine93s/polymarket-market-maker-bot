@@ -16,7 +16,7 @@ class PolymarketWebSocketClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.ws_url = settings.polymarket_ws_url
-        self.websocket: websockets.WebSocketServerProtocol | None = None
+        self.websocket: websockets.WebSocketClientProtocol | None = None
         self.message_handlers: dict[str, Callable] = {}
         self.running = False
 
