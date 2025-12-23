@@ -55,7 +55,8 @@ class OrderExecutor:
                 f"{self.settings.polymarket_api_url}/order/{order_id}",
             )
             response.raise_for_status()
-            
+
+            self.pending_cancellations.discard(order_id)
             logger.info("order_cancelled", order_id=order_id)
             return True
         except Exception as e:
