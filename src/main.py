@@ -8,6 +8,7 @@ from typing import Any
 import structlog
 from dotenv import load_dotenv
 
+
 from src.config import Settings, get_settings
 from src.execution.order_executor import OrderExecutor
 from src.inventory.inventory_manager import InventoryManager
