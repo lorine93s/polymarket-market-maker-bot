@@ -73,7 +73,7 @@ class MarketMakerBot:
         except Exception as e:
             logger.error("orderbook_update_failed", error=str(e))
 
-    def _handle_orderbook_update(self, data: dict[str, Any]):
+    async def _handle_orderbook_update(self, data: dict[str, Any]):
         if data.get("market") == self.settings.market_id:
             self.current_orderbook = data.get("book", self.current_orderbook)
 
