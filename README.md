@@ -4,8 +4,8 @@ Production-grade **Polymarket CLOB market-making bot** with optimized inventory 
 Designed for professional market makers seeking balanced exposure, efficient quote placement, and maximum spread capture on Polymarket prediction markets.
 
 <p>
-  <a href="mailto:xsui46941@gmail.com">
-    <img src="https://img.shields.io/badge/Email-xsui46941%40gmail.com-ef4444?style=flat&logo=gmail&logoColor=white" />
+  <a href="mailto:milosk920125@gmail.com">
+    <img src="https://img.shields.io/badge/Email-milosk920125@gmail.com-ef4444?style=flat&logo=gmail&logoColor=white" />
   </a>
   <a href="https://t.me/lorine93s">
     <img src="https://img.shields.io/badge/Telegram-@lorine93s-2AABEE?style=flat&logo=telegram&logoColor=white" />
@@ -118,114 +118,71 @@ The Polymarket Market Maker Bot provides:
 - `src/services/auto_redeem.py` – Automatic position redemption for settled markets
 - `src/main.py` – Main orchestrator for market-making loop and lifecycle
 
-## Getting Started
+## Quick start
 
-### 1. Requirements
-
-- Python **3.11+**
-- **Ethereum private key** with funds on Polygon network
-- **Polygon RPC endpoint** (public or private)
-- Polymarket account with sufficient balance for trading
-- Understanding of market-making risks and Polymarket mechanics
-
-### 2. Installation
+### 1) Setup
 
 ```bash
 git clone https://github.com/your-org/polymarket-market-maker-bot.git
 cd polymarket-market-maker-bot
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+```
+
+Activate venv:
+
+- Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+- macOS/Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+Install deps:
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configuration
+### 2) Configure `.env`
 
-Create a `.env` file:
-
-```env
-ENVIRONMENT=production
-LOG_LEVEL=INFO
-
-# Polymarket API
-POLYMARKET_API_URL=https://clob.polymarket.com
-POLYMARKET_WS_URL=wss://clob-ws.polymarket.com
-
-# Authentication (REQUIRED)
-PRIVATE_KEY=0x...
-PUBLIC_ADDRESS=0x...
-
-# Market Configuration
-MARKET_ID=0x...
-
-# Market Discovery
-MARKET_DISCOVERY_ENABLED=true
-DISCOVERY_WINDOW_MINUTES=15
-
-# Quoting Parameters
-DEFAULT_SIZE=100.0
-MIN_SPREAD_BPS=10
-QUOTE_STEP_BPS=5
-OVERSIZE_THRESHOLD=1.5
-
-# Inventory Management
-MAX_EXPOSURE_USD=10000.0
-MIN_EXPOSURE_USD=-10000.0
-TARGET_INVENTORY_BALANCE=0.0
-INVENTORY_SKEW_LIMIT=0.3
-
-# Cancel/Replace Logic
-CANCEL_REPLACE_INTERVAL_MS=500
-TAKER_DELAY_MS=500
-BATCH_CANCELLATIONS=true
-
-# Risk Management
-MAX_POSITION_SIZE_USD=5000.0
-STOP_LOSS_PCT=10.0
-
-# Auto-Redeem
-AUTO_REDEEM_ENABLED=true
-REDEEM_THRESHOLD_USD=1.0
-
-# Gas Optimization
-GAS_BATCHING_ENABLED=true
-GAS_PRICE_GWEI=20.0
-
-# Performance Tuning
-QUOTE_REFRESH_RATE_MS=1000
-ORDER_LIFETIME_MS=3000
-
-# Metrics and Logging
-METRICS_HOST=0.0.0.0
-METRICS_PORT=9305
-
-# Polygon RPC
-RPC_URL=https://polygon-rpc.com
+```powershell
+copy .env.example .env
 ```
 
-### 4. Run the Bot
+Set these two values:
+
+```env
+PRIVATE_KEY=0xYOUR_PRIVATE_KEY
+MARKET_ID=0xYOUR_MARKET_ID
+```
+
+`.env.example` also includes a small set of recommended settings (size/spread/risk/timing). You can leave them as-is for the first run.
+
+### 3) Run
 
 ```bash
 python -m src.main
 ```
 
-The bot will:
-- Discover and connect to the specified Polymarket market
-- Establish WebSocket connection for real-time orderbook updates
-- Start the cancel/replace cycle with optimized quote placement
-- Monitor inventory and adjust quotes for balanced exposure
-- Execute auto-redeem for settled positions
-- Log all operations and expose Prometheus metrics
+## Common setup errors
 
-### 5. Docker Deployment
+- Startup `ValidationError`:
+  - Check `.env` exists in the project root
+  - Check `PRIVATE_KEY` and `MARKET_ID` are set
+- No quotes placed:
+  - Confirm the market is active and your `MARKET_ID` is correct
+  - Check logs for API or websocket errors
 
-```bash
-docker compose up --build -d
-```
+## Safety notes
 
-View logs:
-```bash
-docker compose logs -f market-maker-bot
-```
+- Start small and watch exposure/inventory.
+- Never commit real private keys to git.
+- Test with small funds first.
 
 ## Parameter Tuning Guide
 
