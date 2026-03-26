@@ -48,17 +48,19 @@ class OrderExecutor:
         try:
             if self.settings.batch_cancellations and order_id in self.pending_cancellations:
                 return True
-            
+
             self.pending_cancellations.add(order_id)
-            
+
             response = await self.client.delete(
                 f"{self.settings.polymarket_api_url}/order/{order_id}",
             )
             response.raise_for_status()
-            
+
+            self.pending_cancellations.discard(order_id)
             logger.info("order_cancelled", order_id=order_id)
             return True
         except Exception as e:
+            self.pending_cancellations.discard(order_id)
             logger.error("order_cancellation_failed", order_id=order_id, error=str(e))
             return False
 
@@ -85,15 +87,16 @@ class OrderExecutor:
                 if await self.cancel_order(order_id):
                     cancelled += 1
             return cancelled
-        
+
         try:
             response = await self.client.post(
                 f"{self.settings.polymarket_api_url}/orders/cancel",
                 json={"orderIds": order_ids},
             )
             response.raise_for_status()
-            
-            cancelled = len([oid for oid in order_ids if oid not in self.pending_cancellations])
+
+            result = response.json()
+            cancelled = result.get("cancelled", len(order_ids))
             self.pending_cancellations.clear()
             logger.info("batch_orders_cancelled", count=cancelled)
             return cancelled

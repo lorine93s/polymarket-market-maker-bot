@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 from typing import Any, Callable
 
 import structlog
 import websockets
+from websockets.client import WebSocketClientProtocol
 
 from src.config import Settings
 
@@ -16,9 +18,10 @@ class PolymarketWebSocketClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.ws_url = settings.polymarket_ws_url
-        self.websocket: websockets.WebSocketServerProtocol | None = None
+        self.websocket: WebSocketClientProtocol | None = None
         self.message_handlers: dict[str, Callable] = {}
         self.running = False
+        self._subscriptions: list[dict[str, Any]] = []
 
     def register_handler(self, message_type: str, handler: Callable):
         self.message_handlers[message_type] = handler
@@ -42,6 +45,7 @@ class PolymarketWebSocketClient:
             "market": market_id,
         }
         await self.websocket.send(json.dumps(message))
+        self._subscriptions.append(message)
         logger.info("orderbook_subscribed", market_id=market_id)
 
     async def subscribe_trades(self, market_id: str):
@@ -54,7 +58,17 @@ class PolymarketWebSocketClient:
             "market": market_id,
         }
         await self.websocket.send(json.dumps(message))
+        self._subscriptions.append(message)
         logger.info("trades_subscribed", market_id=market_id)
+
+    async def _resubscribe_all(self):
+        """Resubscribe to all channels after reconnection."""
+        for message in self._subscriptions:
+            try:
+                await self.websocket.send(json.dumps(message))
+                logger.info("resubscribed", channel=message.get("channel"), market=message.get("market"))
+            except Exception as e:
+                logger.error("resubscription_failed", error=str(e))
 
     async def listen(self):
         if not self.websocket:
@@ -67,12 +81,17 @@ class PolymarketWebSocketClient:
 
                 message_type = data.get("type")
                 if message_type and message_type in self.message_handlers:
-                    await self.message_handlers[message_type](data)
+                    handler = self.message_handlers[message_type]
+                    if inspect.iscoroutinefunction(handler):
+                        await handler(data)
+                    else:
+                        handler(data)
 
             except websockets.exceptions.ConnectionClosed:
                 logger.warning("websocket_connection_closed")
                 await asyncio.sleep(5)
                 await self.connect()
+                await self._resubscribe_all()
             except Exception as e:
                 logger.error("websocket_listen_error", error=str(e))
                 await asyncio.sleep(1)

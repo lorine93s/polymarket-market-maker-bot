@@ -19,6 +19,14 @@ from src.polymarket.rest_client import PolymarketRestClient
 from src.polymarket.websocket_client import PolymarketWebSocketClient
 from src.risk.risk_manager import RiskManager
 from src.services import AutoRedeem, start_metrics_server
+from src.services.metrics import (
+    record_order_placed,
+    record_order_filled,
+    record_order_cancelled,
+    record_inventory,
+    record_exposure,
+    record_spread,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -78,6 +86,45 @@ class MarketMakerBot:
         if data.get("market") == self.settings.market_id:
             self.current_orderbook = data.get("book", self.current_orderbook)
 
+    def _handle_trade(self, data: dict[str, Any]):
+        """Handle trade/fill notifications and update inventory."""
+        if data.get("market") != self.settings.market_id:
+            return
+
+        maker = data.get("maker", "")
+        if maker.lower() != self.order_signer.get_address().lower():
+            return
+
+        side = data.get("side", "")
+        size = float(data.get("size", 0))
+        price = float(data.get("price", 0))
+        outcome = data.get("outcome", "YES")
+
+        if outcome == "YES":
+            if side == "BUY":
+                self.inventory_manager.update_inventory(size, 0, price)
+            else:
+                self.inventory_manager.update_inventory(-size, 0, price)
+        else:
+            if side == "BUY":
+                self.inventory_manager.update_inventory(0, size, price)
+            else:
+                self.inventory_manager.update_inventory(0, -size, price)
+
+        record_order_filled(side, outcome)
+        record_inventory("yes", self.inventory_manager.inventory.yes_position)
+        record_inventory("no", self.inventory_manager.inventory.no_position)
+        record_exposure(self.inventory_manager.inventory.net_exposure_usd)
+
+        logger.info(
+            "trade_filled",
+            side=side,
+            size=size,
+            price=price,
+            outcome=outcome,
+            net_exposure=self.inventory_manager.inventory.net_exposure_usd,
+        )
+
     async def refresh_quotes(self, market_info: dict[str, Any]):
         current_time = time.time() * 1000
         elapsed = current_time - self.last_quote_time
@@ -95,13 +142,17 @@ class MarketMakerBot:
         best_bid = float(orderbook.get("best_bid", 0))
         best_ask = float(orderbook.get("best_ask", 1))
         
-        if best_bid <= 0 or best_ask <= 1:
+        if best_bid <= 0 or best_ask >= 1 or best_bid >= best_ask:
             logger.warning("invalid_orderbook", best_bid=best_bid, best_ask=best_ask)
             return
         
         yes_token_id = market_info.get("yes_token_id", "")
         no_token_id = market_info.get("no_token_id", "")
-        
+
+        mid_price = (best_bid + best_ask) / 2.0
+        spread_bps = ((best_ask - best_bid) / mid_price) * 10000 if mid_price > 0 else 0
+        record_spread(spread_bps)
+
         yes_quote, no_quote = self.quote_engine.generate_quotes(
             self.settings.market_id, best_bid, best_ask, yes_token_id, no_token_id
         )
@@ -131,7 +182,9 @@ class MarketMakerBot:
                     order_ids_to_cancel.append(order.get("id"))
             
             if order_ids_to_cancel:
-                await self.order_executor.batch_cancel_orders(order_ids_to_cancel)
+                cancelled_count = await self.order_executor.batch_cancel_orders(order_ids_to_cancel)
+                for _ in range(cancelled_count):
+                    record_order_cancelled()
         except Exception as e:
             logger.error("stale_order_cancellation_failed", error=str(e))
 
@@ -152,6 +205,7 @@ class MarketMakerBot:
             }
             
             result = await self.order_executor.place_order(order)
+            record_order_placed(quote.side, outcome)
             logger.info(
                 "quote_placed",
                 outcome=outcome,
@@ -197,6 +251,8 @@ class MarketMakerBot:
         if self.settings.market_discovery_enabled:
             await self.ws_client.connect()
             await self.ws_client.subscribe_orderbook(self.settings.market_id)
+            await self.ws_client.subscribe_trades(self.settings.market_id)
+            self.ws_client.register_handler("trade", self._handle_trade)
         
         tasks = [
             self.run_cancel_replace_cycle(market_info),
@@ -222,7 +278,6 @@ class MarketMakerBot:
 
 
 async def bootstrap(settings: Settings):
-    load_dotenv()
     configure_logging(settings.log_level)
     start_metrics_server(settings.metrics_host, settings.metrics_port)
 
@@ -249,6 +304,7 @@ async def bootstrap(settings: Settings):
 
 
 def main():
+    load_dotenv()
     settings = get_settings()
     asyncio.run(bootstrap(settings))
 
