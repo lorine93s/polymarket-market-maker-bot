@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Dependencies
 node_modules/
 
@@ -18,11 +19,14 @@ venv/
 .env.*.local
 
 # Logs
+=======
+node_modules/
+dist/
+.env
+>>>>>>> eb87b2a0308eb2f38f96ff75c6f2048d1fe6c0bf
 *.log
-logs/
-
-# OS
 .DS_Store
+<<<<<<< HEAD
 Thumbs.db
 
 # IDE
@@ -32,3 +36,6 @@ Thumbs.db
 # Test / coverage
 coverage/
 .nyc_output/
+=======
+package-lock.json
+>>>>>>> eb87b2a0308eb2f38f96ff75c6f2048d1fe6c0bf
