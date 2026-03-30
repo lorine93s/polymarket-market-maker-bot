@@ -1,103 +1,82 @@
-# Polymarket Market Maker Bot (TypeScript)
+# Polymarket Market Maker Bot
 
-Node.js **20+** market-making bot for Polymarket CLOB: quotes, cancel/replace, basic risk limits, optional auto-redeem, and a Prometheus `/metrics` endpoint.
+Production-grade **Polymarket CLOB** market-making bot with optimized inventory management, spread farming, intelligent cancel/replace cycles, and automated risk controls.
 
-<<<<<<< HEAD
-## Quick start
-=======
-<p>
-  <a href="mailto:milosk920125@gmail.com">
-    <img src="https://img.shields.io/badge/Email-milosk920125@gmail.com-ef4444?style=flat&logo=gmail&logoColor=white" />
-  </a>
-  <a href="https://t.me/lorine93s">
-    <img src="https://img.shields.io/badge/Telegram-@lorine93s-2AABEE?style=flat&logo=telegram&logoColor=white" />
-  </a>
-  <a href="https://twitter.com/kakamajo_btc">
-    <img src="https://img.shields.io/badge/Twitter-@kakamajo__btc-1DA1F2?style=flat&logo=twitter&logoColor=white" />
-  </a>
-</p>
->>>>>>> eb87b2a0308eb2f38f96ff75c6f2048d1fe6c0bf
+Built in **TypeScript on Node.js 20+**. It is aimed at market makers who want balanced exposure, efficient quote placement, and strong spread capture on Polymarket prediction markets.
 
-1. Install Node.js 20 or newer.
+---
 
-<<<<<<< HEAD
-2. Install dependencies and build:
-
-```bash
-npm install
-npm run build
-```
-
-3. Copy env and set secrets:
-=======
-The Polymarket Market Maker Bot provides:
+## What this bot does
 
 - **Real-time market making** on Polymarket CLOB (Central Limit Order Book)
 - **Balanced inventory management** with mirrored YES/NO exposure control
-- **Intelligent quote placement** at top-of-book for maximum spread capture
-- **Optimized cancel/replace cycles** tuned for 500ms taker delay
-- **Passive order execution** to earn maker rebates and avoid crossing
-- **Risk management** with exposure limits, position size caps, and inventory skew checks
-- **Auto-redeem** for settled markets and profitable positions
-- **Gas batching** to minimize on-chain transaction costs
-- **Real-time orderbook tracking** via WebSocket for low-latency updates
+- **Intelligent quote placement** around mid-price using spread (basis points) and orderbook data
+- **Optimized cancel/replace** cycles with configurable intervals (aligned with typical taker-delay style timing)
+- **Passive execution intent** — quotes are placed as limit-style orders; the design favors maker flow and avoids unnecessary crossing when configured conservatively
+- **Risk management** — exposure limits, position size caps, and inventory skew checks before placing orders
+- **Auto-redeem** — optional redemption of settled positions above a USD threshold (REST integration)
+- **Batch operations** — optional batch cancellation to reduce API round-trips (configurable)
+- **Real-time orderbook updates** via WebSocket when market discovery mode is enabled
+- **Observability** — Prometheus metrics endpoint and structured JSON logs (Pino)
 
-## Core Features
+---
 
-### Inventory Balance & Exposure Control
+## Core features
 
-- **Mirrored YES/NO positioning** – Maintains balanced exposure across both sides
-- **Net exposure limits** – Configurable min/max exposure in USD
-- **Inventory skew detection** – Automatically adjusts quote sizes when inventory becomes unbalanced
-- **Automatic rebalancing** – Smart quote sizing to reduce runaway inventory
-- **Target inventory balance** – Maintains desired net exposure level
+### Inventory balance and exposure control
 
-### Spread Farming Efficiency
+- **Mirrored YES/NO positioning** — Maintains balanced exposure across both sides (within configured limits)
+- **Net exposure limits** — Configurable min/max exposure in USD
+- **Inventory skew detection** — Risk layer checks skew before trading
+- **Quote sizing** — Base size adjusted by inventory and exposure headroom
+- **Target inventory balance** — Configurable neutral or biased target via `TARGET_INVENTORY_BALANCE`
 
-- **Top-of-book quoting** – Places orders at best bid/ask for maximum fill probability
-- **Passive order execution** – All orders are maker orders to earn rebates
-- **Queue positioning** – Optimized order placement for better queue position
-- **Missed fill reduction** – Fast cancel/replace cycles to capture spread opportunities
-- **Anti-crossing logic** – Prevents accidental taker orders
+### Spread farming efficiency
 
-### Cancel/Replace Cadence
+- **Spread-based quoting** — Mid price from best bid/ask; bid/ask derived from `MIN_SPREAD_BPS`
+- **Passive-first design** — Orders are placed off mid with spread; tune size and refresh to stay passive
+- **Cancel/replace cadence** — Refreshes quotes on a timer and replaces stale orders
+- **Stale order cancellation** — Orders older than `ORDER_LIFETIME_MS` can be batched-cancelled
 
-- **Low-latency refresh cycles** – Configurable quote refresh rate (default: 1000ms)
-- **500ms taker delay optimization** – Timing logic tuned for Polymarket's 500ms delay
-- **Batch cancellations** – Groups cancel requests to reduce API calls and gas costs
-- **Stale order detection** – Automatically cancels orders exceeding lifetime threshold
-- **Smooth quote transitions** – No gaps or overlaps during refresh cycles
+### Cancel/replace cadence
 
-### Market Discovery & Real-Time Updates
+- **Configurable refresh** — `QUOTE_REFRESH_RATE_MS` (default 1000ms)
+- **Taker-delay style tuning** — `TAKER_DELAY_MS` / `CANCEL_REPLACE_INTERVAL_MS` (default 500ms) for loop timing
+- **Batch cancellations** — `BATCH_CANCELLATIONS` groups cancels when supported by the API path used
+- **Stale order detection** — Based on order timestamps vs `ORDER_LIFETIME_MS`
 
-- **15m/1h window discovery** – Automatically discovers markets within discovery windows
-- **WebSocket orderbook feeds** – Real-time L2 orderbook updates for instant quote adjustments
-- **Trade feed monitoring** – Tracks fills and adjusts inventory automatically
-- **Market info caching** – Efficient market metadata retrieval
+### Market discovery and real-time updates
 
-### Risk Management
+- **Discovery mode** — When enabled, loads active markets and resolves your configured `MARKET_ID`
+- **Direct mode** — When discovery is off, loads market metadata for `MARKET_ID` via REST
+- **WebSocket orderbook** — Subscribes to L2-style updates for the active market when discovery is enabled
+- **REST fallbacks** — Orderbook and market info via HTTP when needed
 
-- **Exposure limits** – Hard caps on net exposure in USD
-- **Position size limits** – Maximum single order size
-- **Inventory skew limits** – Prevents excessive position concentration
-- **Stop-loss protection** – Optional percentage-based stop-loss
-- **Pre-trade validation** – All orders validated before placement
+`DISCOVERY_WINDOW_MINUTES` is available in config for future or external tooling; the core loop keys off `MARKET_ID` and active market lists.
 
-### Auto-Redeem & Gas Optimization
+### Risk management
 
-- **Automatic redemption** – Redeems settled positions above threshold
-- **Gas batching** – Groups multiple operations to reduce gas costs
-- **Configurable gas price** – Customizable gas price in Gwei
-- **Efficient order lifecycle** – Minimizes on-chain operations
+- **Exposure limits** — Hard caps via `MAX_EXPOSURE_USD` / `MIN_EXPOSURE_USD`
+- **Position size limits** — `MAX_POSITION_SIZE_USD` per validation pass
+- **Inventory skew limits** — `INVENTORY_SKEW_LIMIT`
+- **Stop-loss** — `STOP_LOSS_PCT` present in config (extend strategy logic if you need it enforced end-to-end)
+- **Pre-trade validation** — `RiskManager` validates before each quote
 
-### Performance Monitoring
+### Auto-redeem and gas-related settings
 
-- **Prometheus metrics** – Real-time metrics for orders, inventory, exposure, and profit
-- **Structured JSON logging** – Full audit trail of all operations
-- **Fill rate tracking** – Monitors passive fill rates
-- **Latency metrics** – Quote generation and placement latency tracking
+- **Automatic redemption** — Polls redeemable positions and redeems above `REDEEM_THRESHOLD_USD` when enabled
+- **Gas-oriented flags** — `GAS_BATCHING_ENABLED`, `GAS_PRICE_GWEI` in config for workflows that use on-chain operations alongside trading
+- **Efficient cancel paths** — Prefer batch cancel when `BATCH_CANCELLATIONS=true`
 
-## Technical Architecture
+### Performance monitoring
+
+- **Prometheus** — HTTP `/metrics` (default port 9305)
+- **Structured JSON logging** — Pino; suitable for aggregation and audit trails
+- **Metric series** — Orders, inventory, exposure, spread, profit, quote latency (see below)
+
+---
+
+## Technical architecture
 
 ```
 ┌─────────────────────┐      ┌──────────────────────┐      ┌──────────────────┐
@@ -118,114 +97,233 @@ The Polymarket Market Maker Bot provides:
 └─────────────────────┘      └──────────────────┘      └──────────────────┘
 ```
 
-### Key Modules
+---
 
-- `src/config.py` – Pydantic settings for all bot parameters (exposure, spreads, timing, etc.)
-- `src/polymarket/rest_client.py` – REST API client for market data, orders, balances
-- `src/polymarket/websocket_client.py` – WebSocket client for real-time orderbook/trade feeds
-- `src/polymarket/order_signer.py` – Ethereum order signing for authenticated requests
-- `src/inventory/inventory_manager.py` – Inventory tracking and balanced exposure management
-- `src/market_maker/quote_engine.py` – Quote generation with spread calculation and sizing
-- `src/execution/order_executor.py` – Order placement, cancellation, and batching
-- `src/risk/risk_manager.py` – Pre-trade validations and risk checks
-- `src/services/auto_redeem.py` – Automatic position redemption for settled markets
-- `src/main.py` – Main orchestrator for market-making loop and lifecycle
+## Key modules (TypeScript)
+
+| Module | Role |
+|--------|------|
+| `src/config.ts` | Zod-validated environment settings |
+| `src/logger.ts` | Pino JSON logging |
+| `src/polymarket/restClient.ts` | REST client (markets, book, orders, balances) |
+| `src/polymarket/websocketClient.ts` | WebSocket client (subscribe / listen / reconnect) |
+| `src/polymarket/orderSigner.ts` | Ethereum signing for orders (ethers) |
+| `src/inventory/inventoryManager.ts` | Inventory and exposure helpers |
+| `src/marketMaker/quoteEngine.ts` | Quote generation (spread, sizing) |
+| `src/execution/orderExecutor.ts` | Place / cancel / batch cancel |
+| `src/risk/riskManager.ts` | Pre-trade risk checks |
+| `src/services/autoRedeem.ts` | Redeem flow via REST |
+| `src/services/metrics.ts` | Prometheus registry and `/metrics` server |
+| `src/bot.ts` | Main market-making loop and lifecycle |
+| `src/main.ts` | Entrypoint, signals, metrics bootstrap |
+
+---
 
 ## Quick start
 
-### 1) Setup
+### 1) Prerequisites
+
+- **Node.js 20+**
+- **npm** (or compatible client)
+- Polygon-funded wallet and Polymarket `PRIVATE_KEY` / `MARKET_ID`
+
+### 2) Install
 
 ```bash
 git clone https://github.com/your-org/polymarket-market-maker-bot.git
 cd polymarket-market-maker-bot
-python -m venv .venv
+npm install
+npm run build
 ```
 
-Activate venv:
-
-- Windows PowerShell:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-- macOS/Linux:
+### 3) Configure `.env`
 
 ```bash
-source .venv/bin/activate
-```
-
-Install deps:
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2) Configure `.env`
-
-```powershell
 copy .env.example .env
 ```
 
-Set these two values:
+Minimum:
 
 ```env
 PRIVATE_KEY=0xYOUR_PRIVATE_KEY
 MARKET_ID=0xYOUR_MARKET_ID
 ```
 
-`.env.example` also includes a small set of recommended settings (size/spread/risk/timing). You can leave them as-is for the first run.
+`.env.example` also includes recommended defaults for size, spread, risk, and timing. You can keep them for a first run, then tune.
 
-### 3) Run
->>>>>>> eb87b2a0308eb2f38f96ff75c6f2048d1fe6c0bf
-
-```bash
-copy .env.example .env
-```
-
-<<<<<<< HEAD
-At minimum set `PRIVATE_KEY` and `MARKET_ID`.
-
-4. Run:
+### 4) Run
 
 ```bash
 npm start
 ```
 
-For development without a build step:
+Development (TypeScript directly):
 
 ```bash
 npm run dev
 ```
-=======
+
+---
+
 ## Common setup errors
 
-- Startup `ValidationError`:
-  - Check `.env` exists in the project root
-  - Check `PRIVATE_KEY` and `MARKET_ID` are set
-- No quotes placed:
-  - Confirm the market is active and your `MARKET_ID` is correct
-  - Check logs for API or websocket errors
+- **Invalid CONFIG at startup** — `.env` missing or required keys unset; fix `PRIVATE_KEY` and `MARKET_ID` first.
+- **No quotes** — Confirm the market is active, `MARKET_ID` is correct, and REST returns a sensible orderbook (`best_bid` / `best_ask`).
+- **WebSocket issues** — Check `POLYMARKET_WS_URL` and network/firewall rules.
+
+---
 
 ## Safety notes
 
-- Start small and watch exposure/inventory.
-- Never commit real private keys to git.
-- Test with small funds first.
->>>>>>> eb87b2a0308eb2f38f96ff75c6f2048d1fe6c0bf
+- Start with small `DEFAULT_SIZE` and tight exposure caps.
+- Never commit real private keys.
+- Paper-test logic and logs before scaling size.
 
-## Configuration
+---
 
-Environment variables match the Python version: see `.env.example`. Names are **UPPER_SNAKE_CASE** (e.g. `POLYMARKET_API_URL`, `QUOTE_REFRESH_RATE_MS`).
+## Parameter tuning guide
 
-## Metrics
+### Inventory balance
 
-Default scrape URL: `http://localhost:9305/metrics`
+- **MAX_EXPOSURE_USD / MIN_EXPOSURE_USD** — Set from capital and risk tolerance; smaller = tighter control.
+- **INVENTORY_SKEW_LIMIT** — e.g. `0.3` ≈ 30% max skew before risk rejects (tune to your style).
+- **TARGET_INVENTORY_BALANCE** — `0` neutral; positive/negative for directional bias in sizing behavior.
 
-## Docs
+### Spread farming
 
-More guides: [`docs/README.md`](docs/README.md).
+- **MIN_SPREAD_BPS** — Minimum spread width (10 bps = 0.1%).
+- **QUOTE_STEP_BPS** — Step size between levels (reserved for extensions).
+- **DEFAULT_SIZE** — Base notional; scale with depth and liquidity.
 
-## Legacy Python
+### Cancel/replace timing
 
-The previous Python implementation was replaced by this TypeScript codebase. If you still need the old tree, recover it from git history.
+- **CANCEL_REPLACE_INTERVAL_MS** — Loop sleep between refresh passes (default 500ms).
+- **QUOTE_REFRESH_RATE_MS** — Minimum time between quote refreshes (default 1000ms).
+- **ORDER_LIFETIME_MS** — Stale order age before cancel (default 3000ms).
+
+### Performance-oriented flags
+
+- **BATCH_CANCELLATIONS** — `true` to prefer batch cancel endpoint when applicable.
+- **AUTO_REDEEM_ENABLED** — `true` to run periodic redeem passes.
+- **GAS_BATCHING_ENABLED** — For strategies combining on-chain ops with API trading.
+
+---
+
+## Monitoring and observability
+
+### Prometheus metrics
+
+Scrape URL (default): `http://localhost:9305/metrics`
+
+Key series (names may vary slightly by version; inspect `/metrics`):
+
+- `pm_mm_orders_placed_total` — Orders placed (labels: side, outcome)
+- `pm_mm_orders_filled_total` — Fills (when wired to your feed)
+- `pm_mm_inventory` — Inventory gauges
+- `pm_mm_exposure_usd` — Net exposure
+- `pm_mm_spread_bps` — Spread
+- `pm_mm_profit_usd` — Profit tracker
+- `pm_mm_quote_latency_ms` — Latency histogram
+
+### Structured logging
+
+Logs are JSON (Pino). Typical topics: quotes placed/cancelled, risk rejections, websocket lifecycle, auto-redeem.
+
+Example shape:
+
+```json
+{
+  "level": 30,
+  "msg": "quote_placed",
+  "outcome": "YES",
+  "side": "BUY",
+  "price": 0.65,
+  "size": 100,
+  "order_id": "0x..."
+}
+```
+
+---
+
+## Performance benchmarks (indicative)
+
+Targets depend on network, API limits, and market. Order-of-magnitude expectations often discussed for similar bots:
+
+| Metric | Typical target range |
+|--------|----------------------|
+| Quote refresh | Sub-100ms locally; end-to-end includes API RTT |
+| Cancel/replace cycle | ~500–1000ms (configurable) |
+| WebSocket RTT | Highly network-dependent |
+| Inventory skew | Below your `INVENTORY_SKEW_LIMIT` |
+
+Treat these as goals, not guarantees.
+
+---
+
+## Who this is for
+
+People searching for: Polymarket market maker bot, Polymarket trading bot, CLOB market making, Polymarket automated trading, prediction market liquidity tools.
+
+Suited to: professional market makers, systematic traders, and builders who want a **TypeScript** codebase they can extend (multi-market, dynamic spreads, ML sizing, portfolio risk, etc.).
+
+---
+
+## Risk management best practices
+
+1. Start small: low `DEFAULT_SIZE` and conservative exposure caps.
+2. Monitor inventory and skew continuously.
+3. Set exposure limits that match worst-case moves.
+4. Validate on small notional before scaling.
+5. Watch gas and API rate limits if you add on-chain workflows.
+6. Read logs for risk rejections and connectivity issues.
+
+---
+
+## Common issues and troubleshooting
+
+### Orders not filling
+
+- Spread too wide or too narrow vs the book — tune `MIN_SPREAD_BPS`.
+- Confirm REST orderbook and websocket (if used) show consistent top of book.
+- Queue position: you may be behind larger makers.
+
+### High inventory skew
+
+- Tighten `MAX_EXPOSURE_USD` / `MIN_EXPOSURE_USD`.
+- Lower size or increase skew sensitivity via config and logic.
+
+### Excessive costs or API load
+
+- Increase `QUOTE_REFRESH_RATE_MS` / `CANCEL_REPLACE_INTERVAL_MS`.
+- Use `BATCH_CANCELLATIONS=true` where supported.
+
+### WebSocket disconnections
+
+- Client reconnects with backoff; check stability of `POLYMARKET_WS_URL` and local network.
+
+---
+
+## Future enhancements
+
+- Multi-market quoting
+- Dynamic spread from volatility or orderbook pressure
+- ML-assisted sizing
+- Portfolio-level risk across markets
+- Deeper fill and position sync from user channel / trades feed
+
+---
+
+## License
+
+Use at your own risk. Market-making involves capital risk and requires understanding prediction markets and Polymarket’s rules.
+
+Ensure compliance with local regulations and [Polymarket’s terms of service](https://polymarket.com) before production use.
+
+---
+
+## Safety and compliance
+
+- This bot can place **real orders** when configured with live keys and funded accounts.
+- Inventory and adverse selection risk are real; monitor continuously.
+- On-chain costs matter when you combine redemption or transfers with trading.
+- Keep audit logs and respect automated-trading and API policies.
