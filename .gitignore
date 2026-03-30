@@ -1,41 +1,40 @@
-<<<<<<< HEAD
 # Dependencies
 node_modules/
 
-# Build
+# Build output
 dist/
+build/
 
-# Python (legacy / local tools)
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-venv/
-*.egg-info/
+# TypeScript
+*.tsbuildinfo
 
-# Environment
+# Environment and secrets
 .env
 .env.local
 .env.*.local
 
 # Logs
-=======
-node_modules/
-dist/
-.env
->>>>>>> eb87b2a0308eb2f38f96ff75c6f2048d1fe6c0bf
 *.log
+logs/
+
+# OS
 .DS_Store
-<<<<<<< HEAD
 Thumbs.db
 
-# IDE
+# IDE / editor
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# Test / coverage
+# Test and coverage
 coverage/
 .nyc_output/
-=======
-package-lock.json
->>>>>>> eb87b2a0308eb2f38f96ff75c6f2048d1fe6c0bf
+
+# Tool caches
+.eslintcache
+.prettiercache
+
+# Optional: local npm pack artifacts
+*.tgz
